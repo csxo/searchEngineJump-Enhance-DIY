@@ -4015,10 +4015,25 @@
                     e.stopPropagation();
                 });
 
-                // Esc 按键快速关闭设置
+                // Esc 按键快速关闭设置 (多层级优先关闭最上层模态框)
                 window.addEventListener("keydown", function(e){
-                    if(e.key === "Escape" && that.mask && that.mask.style.display === "flex"){
-                        that.hide();
+                    if(e.key === "Escape"){
+                        // 1. 若打开了配置文件高级编辑框，优先关闭
+                        var codeBox = document.querySelector("#iqxin-editCodeBox");
+                        if (codeBox) {
+                            that.editCodeBoxClose();
+                            return;
+                        }
+                        // 2. 若打开了搜索引擎编辑/添加框，优先关闭
+                        var modalBox = document.querySelector("#newSearchBox, #newSearchListBox");
+                        if (modalBox) {
+                            that.addItemBoxRemove();
+                            return;
+                        }
+                        // 3. 关闭主设置窗口
+                        if (that.mask && that.mask.style.display === "flex") {
+                            that.hide();
+                        }
                     }
                 });
 
@@ -4954,36 +4969,81 @@
                 }
             },
 
-            // code编辑框
+            // 配置文件编辑与备份 (现代化居中高级代码模态框)
             editCodeBox: function(){
+                this.editCodeBoxClose();
+
+                // 独立半透明背景遮罩
+                var mask = document.createElement("div");
+                mask.id = "iqxin-editCodeBox-mask";
+                this.ele.appendChild(mask);
+
                 var newDiv = document.createElement("div");
-                newDiv.id= "iqxin-editCodeBox";
-                newDiv.innerHTML = "<textarea id='iqxin-editCodeBoxText' style='margin:0px;width:100%;height:350px;'></textarea>" +
-                    "<div style='text-align:center;padding:10px;'>" +
-                        "<button id='xin-codeboxsave' class='addItemBoxBtn iqxin-enterBtn'>保存并生效</button>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;" +
-                        "<button id='xin-copyCode' class='addItemBoxBtn'>复制配置</button>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;" +
-                        "<button id='xin-reset' class='addItemBoxBtn iqxin-closeBtn' title='恢复至初始默认搜索源配置'>恢复默认设置</button>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;" +
-                        "<button id='xin-codeboxclose' class='addItemBoxBtn'>关闭</button>" +
-                    "</div>";
+                newDiv.id = "iqxin-editCodeBox";
+                newDiv.innerHTML = `
+                    <div class="sej-modal-header">
+                        <div class="sej-codebox-header-info">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span class="sej-modal-title">配置文件</span>
+                                <span class="sej-codebox-badge">JSON 高级模式</span>
+                            </div>
+                            <div class="sej-codebox-tip">支持查看、编辑、备份与跨浏览器迁移配置，支持自动格式化与语法校验</div>
+                        </div>
+                        <span id="xin-codeboxclose-x" class="sej-modal-close-btn" title="关闭 (Esc)">×</span>
+                    </div>
+                    <div class="sej-modal-body sej-codebox-body">
+                        <div class="sej-codebox-toolbar">
+                            <span class="sej-codebox-status">数据格式：JSON (已自动缩进)</span>
+                            <div class="sej-codebox-tools">
+                                <button id="xin-formatCode" class="sej-tool-btn" title="格式化并美化 JSON 语法">✨ 格式化</button>
+                                <button id="xin-copyCode" class="sej-tool-btn" title="一键复制全部 JSON 配置到剪贴板">📋 复制配置</button>
+                            </div>
+                        </div>
+                        <textarea id="iqxin-editCodeBoxText" class="sej-codebox-textarea" spellcheck="false" placeholder="在此粘贴或编辑 JSON 格式的配置数据..."></textarea>
+                    </div>
+                    <div class="sej-modal-footer sej-codebox-footer">
+                        <div class="sej-footer-left">
+                            <button id="xin-reset" class="sej-btn sej-btn-danger" title="清空全部自定义数据并恢复默认">恢复默认设置</button>
+                        </div>
+                        <div class="sej-footer-right">
+                            <button id="xin-codeboxclose" class="sej-btn sej-btn-secondary">取消</button>
+                            <button id="xin-codeboxsave" class="sej-btn sej-btn-primary">保存并生效</button>
+                        </div>
+                    </div>
+                `;
                 this.ele.appendChild(newDiv);
-                document.querySelector("#iqxin-editCodeBoxText").value = JSON.stringify(getSettingData,false,4);
+                var curData = GM_getValue("searchEngineJumpData") || getSettingData;
+                var ta = document.querySelector("#iqxin-editCodeBoxText");
+                if (ta) {
+                    ta.value = JSON.stringify(curData, false, 4);
+                    ta.focus();
+                }
             },
             editCodeBoxClose: function(){
                 var odiv = document.querySelector("#iqxin-editCodeBox");
-                if (odiv){
+                if (odiv && odiv.parentNode){
                     odiv.parentNode.removeChild(odiv);
+                }
+                var mask = document.querySelector("#iqxin-editCodeBox-mask");
+                if (mask && mask.parentNode){
+                    mask.parentNode.removeChild(mask);
                 }
             },
             editCodeBoxSave: function(){
-                var text = document.querySelector("#iqxin-editCodeBoxText").value;
+                var text = (document.querySelector("#iqxin-editCodeBoxText")?.value || "").trim();
                 try{
                     var data = JSON.parse(text);
-                    GM_setValue("searchEngineJumpData",data);
-                    iqxinShowTip("配置保存成功");
+                    if (!data || typeof data !== "object") {
+                        throw new Error("格式必须为标准的 JSON 根对象");
+                    }
+                    GM_setValue("searchEngineJumpData", data);
+                    iqxinShowTip("配置保存成功，页面即将刷新...");
                     this.editCodeBoxClose();
-                    window.location.reload();
+                    setTimeout(function(){
+                        window.location.reload();
+                    }, 500);
                 }catch(err){
-                    alert("JSON 数据解析错误, 请检查格式！");
+                    iqxinShowTip("JSON 解析错误，请检查语法：" + err.message);
                 }
             },
 
@@ -5277,7 +5337,7 @@
                     return;
                 }
 
-                if (targetid === "xin-codeboxclose") {
+                if (targetid === "xin-codeboxclose" || targetid === "xin-codeboxclose-x" || targetid === "iqxin-editCodeBox-mask") {
                     this.editCodeBoxClose();
                     return;
                 }
@@ -5285,9 +5345,24 @@
                     this.editCodeBoxSave();
                     return;
                 }
+                if (targetid === "xin-formatCode") {
+                    var ta = document.querySelector("#iqxin-editCodeBoxText");
+                    if (ta) {
+                        try {
+                            var parsed = JSON.parse(ta.value);
+                            ta.value = JSON.stringify(parsed, false, 4);
+                            iqxinShowTip("JSON 格式化成功");
+                        } catch(err) {
+                            iqxinShowTip("JSON 语法有误，无法格式化：" + err.message);
+                        }
+                    }
+                    return;
+                }
                 if (targetid === "xin-copyCode") {
-                    GM_setClipboard(JSON.stringify(getSettingData,false,4));
-                    iqxinShowTip("复制成功");
+                    var ta = document.querySelector("#iqxin-editCodeBoxText");
+                    var codeVal = ta ? ta.value : JSON.stringify(GM_getValue("searchEngineJumpData") || getSettingData, false, 4);
+                    GM_setClipboard(codeVal);
+                    iqxinShowTip("已成功复制全部配置到剪贴板");
                     return;
                 }
                 if (targetid === "xin-reset") {
@@ -6302,7 +6377,256 @@
                         "border-color: rgba(255, 255, 255, 0.1) !important;" +
                         "color: #f5f5f7 !important;" +
                     "}" +
-                    "";
+                    /* 配置文件居中高级模态框 (JSON Editor Modal) */
+                    "@keyframes sejFadeIn { from { opacity: 0; } to { opacity: 1; } }" +
+                    "@keyframes sejModalZoomIn { from { opacity: 0; transform: translate(-50%, -46%) scale(0.97); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }" +
+                    "#iqxin-editCodeBox-mask {" +
+                        "position: fixed !important;" +
+                        "top: 0 !important;" +
+                        "left: 0 !important;" +
+                        "width: 100vw !important;" +
+                        "height: 100vh !important;" +
+                        "background: rgba(0, 0, 0, 0.45) !important;" +
+                        "backdrop-filter: blur(5px) !important;" +
+                        "-webkit-backdrop-filter: blur(5px) !important;" +
+                        "z-index: 200000055 !important;" +
+                        "animation: sejFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;" +
+                    "}" +
+                    "#iqxin-editCodeBox {" +
+                        "position: fixed !important;" +
+                        "top: 50% !important;" +
+                        "left: 50% !important;" +
+                        "transform: translate(-50%, -50%) !important;" +
+                        "z-index: 200000060 !important;" +
+                        "width: 780px !important;" +
+                        "max-width: 92vw !important;" +
+                        "height: 600px !important;" +
+                        "max-height: 86vh !important;" +
+                        "background: #ffffff !important;" +
+                        "border-radius: 20px !important;" +
+                        "box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(0, 0, 0, 0.08) !important;" +
+                        "padding: 22px 26px !important;" +
+                        "box-sizing: border-box !important;" +
+                        "display: flex !important;" +
+                        "flex-direction: column !important;" +
+                        "gap: 14px !important;" +
+                        "animation: sejModalZoomIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;" +
+                    "}" +
+                    ".sej-codebox-header-info {" +
+                        "display: flex !important;" +
+                        "flex-direction: column !important;" +
+                        "gap: 4px !important;" +
+                    "}" +
+                    ".sej-codebox-badge {" +
+                        "font-size: 11px !important;" +
+                        "font-weight: 600 !important;" +
+                        "color: #0071e3 !important;" +
+                        "background: rgba(0, 113, 227, 0.1) !important;" +
+                        "padding: 2px 8px !important;" +
+                        "border-radius: 999px !important;" +
+                        "letter-spacing: 0.2px !important;" +
+                    "}" +
+                    ".sej-codebox-tip {" +
+                        "font-size: 12px !important;" +
+                        "color: #86868b !important;" +
+                    "}" +
+                    ".sej-modal-close-btn {" +
+                        "font-size: 22px !important;" +
+                        "line-height: 1 !important;" +
+                        "color: #86868b !important;" +
+                        "cursor: pointer !important;" +
+                        "width: 28px !important;" +
+                        "height: 28px !important;" +
+                        "display: flex !important;" +
+                        "align-items: center !important;" +
+                        "justify-content: center !important;" +
+                        "border-radius: 50% !important;" +
+                        "transition: all 0.15s !important;" +
+                        "user-select: none !important;" +
+                    "}" +
+                    ".sej-modal-close-btn:hover {" +
+                        "color: #1d1d1f !important;" +
+                        "background: rgba(0, 0, 0, 0.06) !important;" +
+                    "}" +
+                    ".sej-codebox-body {" +
+                        "flex: 1 !important;" +
+                        "display: flex !important;" +
+                        "flex-direction: column !important;" +
+                        "gap: 10px !important;" +
+                        "min-height: 0 !important;" +
+                    "}" +
+                    ".sej-codebox-toolbar {" +
+                        "display: flex !important;" +
+                        "align-items: center !important;" +
+                        "justify-content: space-between !important;" +
+                        "font-size: 12px !important;" +
+                        "color: #86868b !important;" +
+                    "}" +
+                    ".sej-codebox-tools {" +
+                        "display: flex !important;" +
+                        "align-items: center !important;" +
+                        "gap: 8px !important;" +
+                    "}" +
+                    ".sej-tool-btn {" +
+                        "display: inline-flex !important;" +
+                        "align-items: center !important;" +
+                        "gap: 5px !important;" +
+                        "height: 28px !important;" +
+                        "padding: 0 12px !important;" +
+                        "font-size: 12px !important;" +
+                        "font-weight: 500 !important;" +
+                        "color: #1d1d1f !important;" +
+                        "background: #f5f5f7 !important;" +
+                        "border: 1px solid rgba(0, 0, 0, 0.08) !important;" +
+                        "border-radius: 7px !important;" +
+                        "cursor: pointer !important;" +
+                        "transition: all 0.15s !important;" +
+                        "outline: none !important;" +
+                    "}" +
+                    ".sej-tool-btn:hover {" +
+                        "background: #e8e8ed !important;" +
+                        "border-color: rgba(0, 0, 0, 0.15) !important;" +
+                        "color: #0071e3 !important;" +
+                    "}" +
+                    ".sej-codebox-textarea {" +
+                        "flex: 1 !important;" +
+                        "width: 100% !important;" +
+                        "box-sizing: border-box !important;" +
+                        "font-family: ui-monospace, SFMono-Regular, \"SF Mono\", Menlo, Consolas, \"Liberation Mono\", monospace !important;" +
+                        "font-size: 12.5px !important;" +
+                        "line-height: 1.65 !important;" +
+                        "color: #1d1d1f !important;" +
+                        "background: #f8f9fa !important;" +
+                        "border: 1px solid rgba(0, 0, 0, 0.12) !important;" +
+                        "border-radius: 12px !important;" +
+                        "padding: 14px 16px !important;" +
+                        "outline: none !important;" +
+                        "resize: none !important;" +
+                        "white-space: pre !important;" +
+                        "overflow: auto !important;" +
+                        "tab-size: 4 !important;" +
+                        "transition: border-color 0.15s, box-shadow 0.15s !important;" +
+                    "}" +
+                    ".sej-codebox-textarea:focus {" +
+                        "background: #ffffff !important;" +
+                        "border-color: #0071e3 !important;" +
+                        "box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.15) !important;" +
+                    "}" +
+                    ".sej-codebox-footer {" +
+                        "display: flex !important;" +
+                        "align-items: center !important;" +
+                        "justify-content: space-between !important;" +
+                        "padding-top: 12px !important;" +
+                        "border-top: 1px solid rgba(0, 0, 0, 0.06) !important;" +
+                    "}" +
+                    ".sej-footer-right, .sej-footer-left {" +
+                        "display: flex !important;" +
+                        "align-items: center !important;" +
+                        "gap: 10px !important;" +
+                    "}" +
+                    ".sej-btn {" +
+                        "height: 36px !important;" +
+                        "padding: 0 18px !important;" +
+                        "font-size: 13px !important;" +
+                        "font-weight: 500 !important;" +
+                        "border-radius: 8px !important;" +
+                        "cursor: pointer !important;" +
+                        "display: inline-flex !important;" +
+                        "align-items: center !important;" +
+                        "justify-content: center !important;" +
+                        "transition: all 0.15s !important;" +
+                        "border: none !important;" +
+                        "outline: none !important;" +
+                    "}" +
+                    ".sej-btn-primary {" +
+                        "background: #0071e3 !important;" +
+                        "color: #ffffff !important;" +
+                    "}" +
+                    ".sej-btn-primary:hover {" +
+                        "background: #0077ed !important;" +
+                        "box-shadow: 0 4px 14px rgba(0, 113, 227, 0.3) !important;" +
+                    "}" +
+                    ".sej-btn-secondary {" +
+                        "background: #f5f5f7 !important;" +
+                        "color: #1d1d1f !important;" +
+                        "border: 1px solid rgba(0, 0, 0, 0.08) !important;" +
+                    "}" +
+                    ".sej-btn-secondary:hover {" +
+                        "background: #e8e8ed !important;" +
+                    "}" +
+                    ".sej-btn-danger {" +
+                        "background: transparent !important;" +
+                        "color: #ff3b30 !important;" +
+                        "border: 1px solid rgba(255, 59, 48, 0.25) !important;" +
+                    "}" +
+                    ".sej-btn-danger:hover {" +
+                        "background: rgba(255, 59, 48, 0.08) !important;" +
+                        "border-color: #ff3b30 !important;" +
+                    "}" +
+                    "body[qxintheme='dark'] #iqxin-editCodeBox {" +
+                        "background: #242426 !important;" +
+                        "border: 1px solid rgba(255, 255, 255, 0.1) !important;" +
+                        "box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6) !important;" +
+                    "}" +
+                    "body[qxintheme='dark'] .sej-codebox-badge {" +
+                        "color: #0a84ff !important;" +
+                        "background: rgba(10, 132, 255, 0.15) !important;" +
+                    "}" +
+                    "body[qxintheme='dark'] .sej-codebox-tip," +
+                    "body[qxintheme='dark'] .sej-codebox-toolbar {" +
+                        "color: #a1a1a6 !important;" +
+                    "}" +
+                    "body[qxintheme='dark'] .sej-modal-close-btn {" +
+                        "color: #a1a1a6 !important;" +
+                    "}" +
+                    "body[qxintheme='dark'] .sej-modal-close-btn:hover {" +
+                        "color: #f5f5f7 !important;" +
+                        "background: rgba(255, 255, 255, 0.1) !important;" +
+                    "}" +
+                    "body[qxintheme='dark'] .sej-tool-btn {" +
+                        "background: #2c2c2e !important;" +
+                        "color: #f5f5f7 !important;" +
+                        "border-color: rgba(255, 255, 255, 0.1) !important;" +
+                    "}" +
+                    "body[qxintheme='dark'] .sej-tool-btn:hover {" +
+                        "background: #3a3a3c !important;" +
+                        "color: #0a84ff !important;" +
+                    "}" +
+                    "body[qxintheme='dark'] .sej-codebox-textarea {" +
+                        "background: #18181a !important;" +
+                        "color: #e5e5ea !important;" +
+                        "border-color: rgba(255, 255, 255, 0.12) !important;" +
+                    "}" +
+                    "body[qxintheme='dark'] .sej-codebox-textarea:focus {" +
+                        "background: #1c1c1e !important;" +
+                        "border-color: #0a84ff !important;" +
+                        "box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.2) !important;" +
+                    "}" +
+                    "body[qxintheme='dark'] .sej-codebox-footer {" +
+                        "border-top-color: rgba(255, 255, 255, 0.08) !important;" +
+                    "}" +
+                    "body[qxintheme='dark'] .sej-btn-primary {" +
+                        "background: #0a84ff !important;" +
+                        "color: #ffffff !important;" +
+                    "}" +
+                    "body[qxintheme='dark'] .sej-btn-primary:hover {" +
+                        "background: #1f8eff !important;" +
+                    "}" +
+                    "body[qxintheme='dark'] .sej-btn-secondary {" +
+                        "background: #2c2c2e !important;" +
+                        "color: #f5f5f7 !important;" +
+                        "border-color: rgba(255, 255, 255, 0.1) !important;" +
+                    "}" +
+                    "body[qxintheme='dark'] .sej-btn-secondary:hover {" +
+                        "background: #3a3a3c !important;" +
+                    "}" +
+                    "body[qxintheme='dark'] .sej-btn-danger {" +
+                        "color: #ff453a !important;" +
+                        "border-color: rgba(255, 69, 58, 0.3) !important;" +
+                    "}" +
+                    "body[qxintheme='dark'] .sej-btn-danger:hover {" +
+                        "background: rgba(255, 69, 58, 0.12) !important;" +
+                    "}";
                 head = document.getElementsByTagName('head')[0];
                 style = document.createElement('style');
                 style.type = 'text/css';
