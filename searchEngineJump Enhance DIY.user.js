@@ -3,7 +3,7 @@
 // @author         NLF & 锐经 & iqxin & csxo
 // @contributor    iqxin, csxo
 // @description    方便在各个搜索引擎之间快捷跳转，新增AI搜索分类（ChatGPT、Perplexity、秘塔AI、Devv、Claude等主流AI搜索源），设置页重构为左侧竖版分类导航与右侧横向卡片布局（现代化简约设计），支持分类导航与引擎卡片平滑拖拽重排、自动持久化与数字➔A-Z➔中文智能排序，全浏览器兼容。
-// @version        0.1.0
+// @version        0.1.1
 // @created        2011-07-02
 // @lastUpdated    2026-10-20
 
