@@ -2695,6 +2695,43 @@
             });
         }
 
+        // 仅维护 DOM 内已启用在前、已禁用在后分区，严格保留用户现有的相对自定义顺序，绝不按名称字母重排
+        function partitionEngineDomCards(sejcon) {
+            if (!sejcon) return;
+            var engineDrags = Array.from(sejcon.querySelectorAll(".drag"));
+            var enabledDrags = [];
+            var disabledDrags = [];
+
+            engineDrags.forEach(function(card) {
+                var engineEl = card.querySelector(".sej-engine");
+                var isDis = false;
+                if (engineEl) {
+                    var xinVal = parseInt(engineEl.dataset.xin);
+                    if (engineEl.dataset.iqxindisabled === "true" || (!isNaN(xinVal) && xinVal < 0)) {
+                        isDis = true;
+                    }
+                }
+                if (card.dataset.iqxindisabled === "true") isDis = true;
+
+                if (isDis) {
+                    disabledDrags.push(card);
+                } else {
+                    enabledDrags.push(card);
+                }
+            });
+
+            // 保持原有顺序，直接按启用/禁用合并
+            var sorted = enabledDrags.concat(disabledDrags);
+            var addBtn = sejcon.querySelector(".iqxin-additem");
+            sorted.forEach(function(d) {
+                if (addBtn) {
+                    sejcon.insertBefore(d, addBtn);
+                } else {
+                    sejcon.appendChild(d);
+                }
+            });
+        }
+
         // GM_deleteValue("searchEngineJumpData");
         var getSettingData = GM_getValue("searchEngineJumpData");
         if(getSettingData){
@@ -4011,6 +4048,24 @@
                     startContainer: null
                 };
 
+                // 防止在编辑/删除/排序等按钮上触发 HTML5 拖拽导致浏览器吞噬 click 事件
+                layer.addEventListener("mousedown", function(e){
+                    var btn = e.target.closest(".iqxin-set-edit, .iqxin-set-del, .iqxin-title-edit, .iqxin-set-title-del, .iqxin-cat-sort-btn, .iqxin-additem, .sej-cat-badge");
+                    if (btn) {
+                        var draggableParent = btn.closest("[draggable='true']");
+                        if (draggableParent) {
+                            draggableParent.setAttribute("draggable", "false");
+                            var restore = function(){
+                                draggableParent.setAttribute("draggable", "true");
+                                document.removeEventListener("mouseup", restore, true);
+                                document.removeEventListener("dragend", restore, true);
+                            };
+                            document.addEventListener("mouseup", restore, true);
+                            document.addEventListener("dragend", restore, true);
+                        }
+                    }
+                }, true);
+
                 layer.addEventListener("dragstart", function(e){
                     var navItem = e.target.closest(".sej-nav-item");
                     var engineDrag = e.target.closest(".drag");
@@ -4216,8 +4271,8 @@
                                 ' data-iqxindisabled="$disabled$" ' +
                                 ' data-iqxingbk="$gbk$" ' +
                                 '><img src="$favicon$" class="sej-engine-icon"/><span>$name$</span></span>' +
-                                ' <span class="iqxin-set-edit" title="编辑 Edit"><img class="sej-engine-icon" src="' + icon.edit + '"/></span>' +
-                                ' <span class="iqxin-set-del" title="删除 Delete"><img class="sej-engine-icon" src="' + icon.del + '"></span>' +
+                                ' <span class="iqxin-set-edit" draggable="false" title="编辑 Edit"><img draggable="false" class="sej-engine-icon" src="' + icon.edit + '"/></span>' +
+                                ' <span class="iqxin-set-del" draggable="false" title="删除 Delete"><img draggable="false" class="sej-engine-icon" src="' + icon.del + '"></span>' +
                                 '</span>';
 
                 // 1. 顶部 Header (标题、拖动手柄、关闭按钮)
@@ -4274,7 +4329,23 @@
                     oDivTitle.dataset.iqxintitle = details[j][1];
                     oDivTitle.dataset.xin = j;
 
-                    var engineListItme = sortEngineArrayWithPartition(engineList[details[j][1]] || [], true);
+                    var rawEngineList = engineList[details[j][1]] || [];
+                    var engineListItme;
+                    if (getSettingData.autoSortEngine === 1) {
+                        engineListItme = sortEngineArrayWithPartition(rawEngineList, true);
+                    } else if (getSettingData.autoSortEngine === 2) {
+                        engineListItme = sortEngineArrayWithPartition(rawEngineList, false);
+                    } else {
+                        // 手动/自定义模式：绝不按名称重排，严格保留用户自定义顺序（已启用在前，已禁用在后）
+                        var enabledItems = [];
+                        var disabledItems = [];
+                        rawEngineList.forEach(function(item) {
+                            var isDis = !!(item && (item.disable === 'true' || item.disable === true || (typeof item.xin !== 'undefined' && item.xin < 0)));
+                            if (isDis) disabledItems.push(item);
+                            else enabledItems.push(item);
+                        });
+                        engineListItme = enabledItems.concat(disabledItems);
+                    }
                     var count = engineListItme.length;
 
                     oDivTitle.innerHTML = '<span class="iqxin-pointer-events">' + details[j][0] + '</span>' +
@@ -4600,7 +4671,13 @@
 
                 this.parentNode.insertBefore(ospan, this.parentNode.lastChild);
                 this.addItemBoxRemove();
-                sortEngineDomCards(this.parentNode, true);
+                if (getSettingData.autoSortEngine === 1) {
+                    sortEngineDomCards(this.parentNode, true);
+                } else if (getSettingData.autoSortEngine === 2) {
+                    sortEngineDomCards(this.parentNode, false);
+                } else {
+                    partitionEngineDomCards(this.parentNode);
+                }
                 if (this.renderNav) this.renderNav();
                 this.debouncedSave("搜索引擎已添加并保存");
             },
@@ -4843,7 +4920,13 @@
                 this.addItemBoxRemove();
                 var parentSejcon = that.closest(".sejcon");
                 if (parentSejcon) {
-                    sortEngineDomCards(parentSejcon, true);
+                    if (getSettingData.autoSortEngine === 1) {
+                        sortEngineDomCards(parentSejcon, true);
+                    } else if (getSettingData.autoSortEngine === 2) {
+                        sortEngineDomCards(parentSejcon, false);
+                    } else {
+                        partitionEngineDomCards(parentSejcon);
+                    }
                 }
                 if (this.renderNav) this.renderNav();
                 this.debouncedSave("引擎已更新并保存");
@@ -5144,16 +5227,24 @@
                     return;
                 }
 
-                // 编辑单个搜索
-                if(~targetClass.indexOf("iqxin-set-edit") || e.target.closest(".iqxin-set-edit")){
-                    var editBtn = e.target.closest(".iqxin-set-edit") || e.target;
-                    this.editTemp = editBtn.parentNode.querySelector(".sej-engine");
-                    this.editItemBox();
+                // 编辑单个搜索 (更名/配置) - 优先响应并阻止冒泡
+                var editBtn = e.target.closest(".iqxin-set-edit");
+                if (editBtn) {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    var dragCard = editBtn.closest(".drag");
+                    this.editTemp = dragCard ? dragCard.querySelector(".sej-engine") : editBtn.parentNode.querySelector(".sej-engine");
+                    if (this.editTemp) {
+                        this.editItemBox();
+                    }
                     return;
                 }
 
-                // 编辑标题
-                if(~targetClass.indexOf("iqxin-title-edit") || e.target.closest(".iqxin-title-edit")){
+                // 编辑分类标题 (更名分类)
+                var titleEditBtn = e.target.closest(".iqxin-title-edit");
+                if (titleEditBtn) {
+                    e.stopPropagation();
+                    e.preventDefault();
                     this.addTitleEditBox(e);
                     return;
                 }
@@ -5246,7 +5337,14 @@
                     }
                     var parentSejcon = engineNode.closest(".sejcon");
                     if (parentSejcon) {
-                        sortEngineDomCards(parentSejcon, true);
+                        if (getSettingData.autoSortEngine === 1) {
+                            sortEngineDomCards(parentSejcon, true);
+                        } else if (getSettingData.autoSortEngine === 2) {
+                            sortEngineDomCards(parentSejcon, false);
+                        } else {
+                            // 自定义排序模式：完全保留卡片原有顺序，仅维持已启用在前、已禁用在后
+                            partitionEngineDomCards(parentSejcon);
+                        }
                     }
                     this.debouncedSave();
                     return;
@@ -5739,20 +5837,27 @@
                         "display: none !important;" +
                         "align-items: center !important;" +
                         "justify-content: center !important;" +
-                        "width: 14px !important;" +
-                        "height: 14px !important;" +
-                        "margin-left: 2px !important;" +
-                        "border-radius: 3px !important;" +
+                        "width: 18px !important;" +
+                        "height: 18px !important;" +
+                        "margin-left: 3px !important;" +
+                        "border-radius: 4px !important;" +
                         "opacity: 0 !important;" +
-                        "transition: opacity 0.15s !important;" +
+                        "transition: opacity 0.15s, background 0.15s !important;" +
                         "background: transparent !important;" +
                         "padding: 0 !important;" +
                         "cursor: pointer !important;" +
+                        "user-select: none !important;" +
+                        "-webkit-user-drag: none !important;" +
                     "}" +
                     ".iqxin-set-edit .sej-engine-icon," +
-                    ".iqxin-set-del .sej-engine-icon {" +
-                        "width: 11px !important;" +
-                        "height: 11px !important;" +
+                    ".iqxin-set-del .sej-engine-icon," +
+                    ".iqxin-title-edit .sej-engine-icon," +
+                    ".iqxin-set-title-del .sej-engine-icon {" +
+                        "width: 12px !important;" +
+                        "height: 12px !important;" +
+                        "pointer-events: none !important;" +
+                        "user-select: none !important;" +
+                        "-webkit-user-drag: none !important;" +
                     "}" +
                     "#settingLayer .drag:hover .iqxin-set-edit," +
                     "#settingLayer .drag:hover .iqxin-set-del {" +
