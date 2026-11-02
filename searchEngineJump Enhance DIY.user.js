@@ -4067,11 +4067,14 @@
                 layer.addEventListener("mousedown", function(e){
                     var btn = e.target.closest(".iqxin-set-edit, .iqxin-set-del, .iqxin-title-edit, .iqxin-set-title-del, .iqxin-cat-sort-btn, .iqxin-additem, .sej-cat-badge");
                     if (btn) {
+                        e.stopPropagation();
                         var draggableParent = btn.closest("[draggable='true']");
                         if (draggableParent) {
                             draggableParent.setAttribute("draggable", "false");
                             var restore = function(){
-                                draggableParent.setAttribute("draggable", "true");
+                                setTimeout(function(){
+                                    draggableParent.setAttribute("draggable", "true");
+                                }, 50);
                                 document.removeEventListener("mouseup", restore, true);
                                 document.removeEventListener("dragend", restore, true);
                             };
@@ -4297,7 +4300,7 @@
                     '<div class="sej-header-left">' +
                         '<span class="sej-header-logo"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0071e3" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg></span>' +
                         '<span class="sej-header-title">searchEngineJump 设置中心</span>' +
-                        '<span class="sej-header-badge">V0.1.0</span>' +
+                        '<span class="sej-header-badge">V0.1.1</span>' +
                     '</div>' +
                     '<div class="sej-header-right">' +
                         '<span id="xin-close" class="sej-header-close-btn" title="关闭设置 (Esc)">×</span>' +
@@ -4632,6 +4635,14 @@
                     </div>
                 `;
 
+                newDiv.addEventListener("keydown", function(e){
+                    if (e.key === "Enter") {
+                        e.preventDefault();
+                        var enterBtn = newDiv.querySelector("#addItemBoxEnter");
+                        if (enterBtn) enterBtn.click();
+                    }
+                });
+
                 this.ele.appendChild(newDiv);
                 var titleInp = document.querySelector("#iqxin-newTitle");
                 if (titleInp) titleInp.focus();
@@ -4653,46 +4664,86 @@
                     oimg = this.getICON(olink);
                 }
 
-                var a = '<span class="sej-engine"' +
-                            ' data-iqxinimg="$img$" ' +
-                            ' data-iqxintitle="$title$" ' +
-                            ' data-iqxinlink="$link$" ' +
-                            ' data-iqxintarget="$blank$" ' +
-                            '><img src="$favicon$" class="sej-engine-icon" /><span>$name$</span></span>' +
-                            '<span class="iqxin-set-edit" title="编辑 Edit">' +
-                                '<img class="sej-engine-icon" src="' + icon.edit + '">' +
-                            '</span> ' +
-                            '<span class="iqxin-set-del iqxin-set-active" title="删除 Delete">' +
-                                '<img class="sej-engine-icon" src="' + icon.del + '">' +
-                            '</span>' ;
-
-                a = a.replace("$img$", oimg)
-                    .replace("$title$", otitle)
-                    .replace("$link$", olink);
-
-                if (oblank){
-                    a = a.replace('data-iqxintarget="$blank$"', '');
-                } else {
-                    a = a.replace('$blank$', "_blank");
-                };
-
-                a = a.replace('$name$', otitle)
-                    .replace('$favicon$', oimg);
-
                 var ospan = document.createElement("span");
                 ospan.className = "drag";
                 ospan.setAttribute("draggable", "true");
-                ospan.innerHTML = a;
 
-                this.parentNode.insertBefore(ospan, this.parentNode.lastChild);
-                this.addItemBoxRemove();
-                if (getSettingData.autoSortEngine === 1) {
-                    sortEngineDomCards(this.parentNode, true);
-                } else if (getSettingData.autoSortEngine === 2) {
-                    sortEngineDomCards(this.parentNode, false);
-                } else {
-                    partitionEngineDomCards(this.parentNode);
+                var engineSpan = document.createElement("span");
+                engineSpan.className = "sej-engine";
+                engineSpan.dataset.xin = "1";
+                engineSpan.dataset.iqxinimg = oimg;
+                engineSpan.dataset.iqxintitle = otitle;
+                engineSpan.dataset.iqxinlink = olink;
+                if (oblank === 1) { // 1 是 "新标签页"
+                    engineSpan.dataset.iqxintarget = "_blank";
                 }
+
+                var iconImg = document.createElement("img");
+                iconImg.src = oimg;
+                iconImg.className = "sej-engine-icon";
+                iconImg.setAttribute("draggable", "false");
+
+                var textSpan = document.createElement("span");
+                textSpan.textContent = otitle;
+
+                engineSpan.appendChild(iconImg);
+                engineSpan.appendChild(textSpan);
+
+                var editSpan = document.createElement("span");
+                editSpan.className = "iqxin-set-edit";
+                editSpan.setAttribute("draggable", "false");
+                editSpan.title = "编辑 Edit";
+                var editImg = document.createElement("img");
+                editImg.className = "sej-engine-icon";
+                editImg.src = icon.edit;
+                editImg.setAttribute("draggable", "false");
+                editSpan.appendChild(editImg);
+
+                var delSpan = document.createElement("span");
+                delSpan.className = "iqxin-set-del";
+                delSpan.setAttribute("draggable", "false");
+                delSpan.title = "删除 Delete";
+                var delImg = document.createElement("img");
+                delImg.className = "sej-engine-icon";
+                delImg.src = icon.del;
+                delImg.setAttribute("draggable", "false");
+                delSpan.appendChild(delImg);
+
+                ospan.appendChild(engineSpan);
+                ospan.appendChild(document.createTextNode(" "));
+                ospan.appendChild(editSpan);
+                ospan.appendChild(document.createTextNode(" "));
+                ospan.appendChild(delSpan);
+
+                var targetCon = this.parentNode;
+                if (!targetCon || !targetCon.classList || !targetCon.classList.contains("sejcon")) {
+                    targetCon = document.querySelector("#settingLayer .sejcon");
+                }
+
+                if (targetCon) {
+                    var addBtn = targetCon.querySelector(".iqxin-additem");
+                    if (addBtn) {
+                        targetCon.insertBefore(ospan, addBtn);
+                    } else {
+                        targetCon.appendChild(ospan);
+                    }
+
+                    if (getSettingData.autoSortEngine === 1) {
+                        sortEngineDomCards(targetCon, true);
+                    } else if (getSettingData.autoSortEngine === 2) {
+                        sortEngineDomCards(targetCon, false);
+                    } else {
+                        partitionEngineDomCards(targetCon);
+                    }
+
+                    var catSection = targetCon.closest(".iqxin-items");
+                    if (catSection) {
+                        var badge = catSection.querySelector(".sej-cat-badge");
+                        if (badge) badge.innerText = targetCon.querySelectorAll(".drag").length + " 个源";
+                    }
+                }
+
+                this.addItemBoxRemove();
                 if (this.renderNav) this.renderNav();
                 this.debouncedSave("搜索引擎已添加并保存");
             },
@@ -4767,6 +4818,15 @@
                         <button id="addSearchListBoxEnter" class="addSearchListBoxEnter addItemBoxBtn iqxin-enterBtn">确定创建</button>
                     </div>
                 `;
+
+                newDiv.addEventListener("keydown", function(e){
+                    if (e.key === "Enter") {
+                        e.preventDefault();
+                        var enterBtn = newDiv.querySelector("#addSearchListBoxEnter");
+                        if (enterBtn) enterBtn.click();
+                    }
+                });
+
                 this.ele.appendChild(newDiv);
 
                 var listNameInp = document.querySelector("#iqxin-newSearchListName");
@@ -4788,20 +4848,20 @@
                 odiv.id = innerName;
                 odiv.className = "iqxin-items";
                 odiv.innerHTML = "" +
-                    '<div class="sejtitle" data-iqxintitle="' + innerName + '" data-xin="99">' +
+                    '<div class="sejtitle" draggable="true" data-iqxintitle="' + innerName + '" data-xin="99">' +
                         '<span class="iqxin-pointer-events">'+ name +'</span>' +
                         '<span class="sej-cat-badge">0 个源</span>' +
                         '<span class="iqxin-cat-sort-btn iqxin-cat-sort-asc" title="当前分类内按首字母 A-Z 升序排序">A-Z</span>' +
                         '<span class="iqxin-cat-sort-btn iqxin-cat-sort-desc" title="当前分类内按首字母 Z-A 降序排序">Z-A</span>' +
                         '<span class="iqxin-title-edit" title="重命名分类">' +
-                            '<img class="sej-engine-icon" src="' + icon.edit + '">' +
+                            '<img draggable="false" class="sej-engine-icon" src="' + icon.edit + '">' +
                         '</span> ' +
-                        '<span class="iqxin-set-title-del iqxin-set-active" title="删除分类">' +
-                            '<img class="sej-engine-icon" src="' + icon.del + '">' +
+                        '<span class="iqxin-set-title-del" title="删除分类">' +
+                            '<img draggable="false" class="sej-engine-icon" src="' + icon.del + '">' +
                         '</span>' +
                     '</div>' +
                     '<div class="sejcon">' +
-                        '<span class="iqxin-additem iqxin-set-active">+ 添加引擎</span>' +
+                        '<span class="iqxin-additem">+ 添加引擎</span>' +
                     '</div>' +
                 "";
 
@@ -4830,17 +4890,20 @@
                 this.addItemBoxRemove();
 
                 var that = this.editTemp;
+                if (!that) return;
 
-                var oimg = that.querySelector(".sej-engine-icon") ? that.querySelector(".sej-engine-icon").src : (that.dataset.iqxinimg || "");
-                var otitle = (that.querySelector("span") ? that.querySelector("span").innerHTML : that.dataset.iqxintitle || "").trim();
-                var olink = that.dataset.iqxinlink || "";
+                var iconElem = that.querySelector(".sej-engine-icon");
+                var oimg = (that.dataset.iqxinimg || (iconElem ? iconElem.src : "")).trim();
+                var textElem = that.querySelector("span:not(.sej-engine-icon)");
+                var otitle = (that.dataset.iqxintitle || (textElem ? textElem.textContent : "")).trim();
+                var olink = (that.dataset.iqxinlink || "").trim();
                 var oblank = that.dataset.iqxintarget;
                 var odisabled = that.dataset.iqxindisabled;
                 var ogbk = that.dataset.iqxingbk;
 
-                var oselected = oblank ? "selected" : "";
-                var odisabled_checked = (odisabled || (that.dataset.xin && parseInt(that.dataset.xin) < 0)) ? "checked" : "";
-                var ogbk_checked = ogbk ? "checked" : "";
+                var oselected = (oblank === "_blank" || oblank === "blank" || oblank === true || oblank === "true") ? "selected" : "";
+                var odisabled_checked = (odisabled === "true" || (that.dataset.xin && parseInt(that.dataset.xin) < 0)) ? "checked" : "";
+                var ogbk_checked = (ogbk === "true" || ogbk === true) ? "checked" : "";
 
                 var newDiv = document.createElement("div");
                 newDiv.id = "newSearchBox";
@@ -4852,15 +4915,15 @@
                     <div class="sej-modal-body">
                         <div class="sej-modal-row">
                             <label>名称</label>
-                            <input id="iqxin-newTitle" class="sej-modal-input" onfocus="this.select()" value="${otitle}">
+                            <input id="iqxin-newTitle" class="sej-modal-input" onfocus="this.select()" placeholder="例如: 百度">
                         </div>
                         <div class="sej-modal-row">
                             <label>网址 (关键字用 %s 代替)</label>
-                            <input id="iqxin-newLink" class="sej-modal-input" onfocus="this.select()" value="${olink}">
+                            <input id="iqxin-newLink" class="sej-modal-input" onfocus="this.select()" placeholder="https://www.google.com/search?q=%s">
                         </div>
                         <div class="sej-modal-row">
                             <label>图标 (留空则自动提取)</label>
-                            <input id="iqxin-newIcon" class="sej-modal-input" onfocus="this.select()" value="${oimg}">
+                            <input id="iqxin-newIcon" class="sej-modal-input" onfocus="this.select()" placeholder="如不填写, 将会自动获取">
                         </div>
                         <div class="sej-modal-row">
                             <label>打开方式</label>
@@ -4880,55 +4943,79 @@
                     </div>
                 `;
 
+                newDiv.addEventListener("keydown", function(e){
+                    if (e.key === "Enter") {
+                        e.preventDefault();
+                        var enterBtn = newDiv.querySelector("#editItemBoxEnter");
+                        if (enterBtn) enterBtn.click();
+                    }
+                });
+
                 this.ele.appendChild(newDiv);
-                var titleInp = document.querySelector("#iqxin-newTitle");
+                var titleInp = newDiv.querySelector("#iqxin-newTitle");
+                var linkInp = newDiv.querySelector("#iqxin-newLink");
+                var iconInp = newDiv.querySelector("#iqxin-newIcon");
+                if (titleInp) titleInp.value = otitle;
+                if (linkInp) linkInp.value = olink;
+                if (iconInp) iconInp.value = oimg;
                 if (titleInp) titleInp.focus();
             },
             // 编辑逻辑：编辑单个搜索
             editItemEnger: function(){
                 var that = this.editTemp;
+                if (!that) {
+                    this.addItemBoxRemove();
+                    return;
+                }
 
-                var otitle,olink,oimg,oblank,odisabled,ogbk;
-                otitle = (document.querySelector("#iqxin-newTitle").value || "").trim();
-                olink = (document.querySelector("#iqxin-newLink").value || "").trim();
-                oimg = (document.querySelector("#iqxin-newIcon").value || "").trim();
-                oblank = document.querySelector("#iqxin-newTarget").selectedIndex;
-                odisabled = document.querySelector("#iqxin-newDisable").checked;
-                ogbk = document.querySelector("#iqxin-newGBK").checked;
+                var otitle = (document.querySelector("#iqxin-newTitle").value || "").trim();
+                var olink = (document.querySelector("#iqxin-newLink").value || "").trim();
+                var oimg = (document.querySelector("#iqxin-newIcon").value || "").trim();
+                var oblank = document.querySelector("#iqxin-newTarget").selectedIndex;
+                var odisabled = document.querySelector("#iqxin-newDisable").checked;
+                var ogbk = document.querySelector("#iqxin-newGBK").checked;
+
+                if (!otitle || !olink) {
+                    alert("请填写名称和网址！");
+                    return;
+                }
 
                 if (!oimg){
                     oimg = this.getICON(olink);
                 }
 
-                if (that.querySelector(".sej-engine-icon")) {
-                    that.querySelector(".sej-engine-icon").src = oimg;
+                var imgElem = that.querySelector(".sej-engine-icon");
+                if (imgElem) {
+                    imgElem.src = oimg;
                 }
-                if (that.querySelector("span")) {
-                    that.querySelector("span").innerHTML = otitle;
+                var textSpan = that.querySelector("span:not(.sej-engine-icon)");
+                if (textSpan) {
+                    textSpan.textContent = otitle;
                 }
                 that.dataset.iqxinimg = oimg;
                 that.dataset.iqxintitle = otitle;
                 that.dataset.iqxinlink = olink;
 
-                if(oblank){
+                if (oblank === 1) { // 1 是 "新标签页"
                     that.dataset.iqxintarget = "_blank";
-                } else{
+                } else {
                     delete that.dataset.iqxintarget;
                 }
 
-                if(odisabled){
+                var curXin = parseInt(that.dataset.xin);
+                if (isNaN(curXin) || curXin === 0) curXin = 1;
+
+                if (odisabled) {
                     that.dataset.iqxindisabled = "true";
-                    var curXin = parseInt(that.dataset.xin);
-                    that.dataset.xin = -(Math.abs(isNaN(curXin) ? 1 : curXin));
-                } else{
+                    that.dataset.xin = -Math.abs(curXin);
+                } else {
                     delete that.dataset.iqxindisabled;
-                    var curXin = parseInt(that.dataset.xin);
-                    that.dataset.xin = Math.abs(isNaN(curXin) ? 1 : curXin);
+                    that.dataset.xin = Math.abs(curXin);
                 }
 
-                if(ogbk){
-                    that.dataset.iqxingbk = true;
-                } else{
+                if (ogbk) {
+                    that.dataset.iqxingbk = "true";
+                } else {
                     delete that.dataset.iqxingbk;
                 }
 
@@ -4950,22 +5037,43 @@
             // 标题编辑框
             addTitleEditBox: function(e){
                 this.addTitleEditBoxRemove();
-                var that = e.target.parentNode;
+                var that = e.target.closest(".sejtitle");
+                if (!that) return;
                 this.parentTemp = that;
-                var otitle = that.querySelector(".iqxin-pointer-events").innerHTML;
+                var titleSpan = that.querySelector(".iqxin-pointer-events");
+                var otitle = (titleSpan ? (titleSpan.innerText || titleSpan.textContent) : "").trim();
                 var odiv = document.createElement("span");
                 odiv.id = "titleEdit";
-                odiv.innerHTML = "<input id='titleEditInput' type='text' onfocus='this.select()' value='"+ otitle +"' style='width: 5em;'>";
-                that.insertBefore(odiv,that.childNodes[1]);
-                document.querySelector("#titleEditInput").focus();
+                odiv.innerHTML = "<input id='titleEditInput' type='text' onfocus='this.select()' style='width: 6em;'>";
+                that.insertBefore(odiv, that.childNodes[1]);
+                var inp = document.querySelector("#titleEditInput");
+                if (inp) {
+                    inp.value = otitle;
+                    inp.focus();
+                    inp.addEventListener("keydown", (function(ev){
+                        if (ev.key === "Enter") {
+                            ev.preventDefault();
+                            this.addTitleEditBoxRemove();
+                        }
+                    }).bind(this));
+                }
             },
             addTitleEditBoxRemove: function(){
                 var odiv = document.querySelector("#titleEdit");
-                if (odiv){
-                    var otitle = document.querySelector("#titleEditInput").value;
-                    this.parentTemp.querySelector(".iqxin-pointer-events").innerHTML = otitle;
-                    odiv.parentNode.removeChild(odiv);
+                if (odiv && this.parentTemp){
+                    var inp = document.querySelector("#titleEditInput");
+                    if (inp) {
+                        var otitle = inp.value.trim();
+                        if (otitle) {
+                            var titleEl = this.parentTemp.querySelector(".iqxin-pointer-events");
+                            if (titleEl) titleEl.innerText = otitle;
+                        }
+                    }
+                    if (odiv.parentNode) {
+                        odiv.parentNode.removeChild(odiv);
+                    }
                     if (this.renderNav) this.renderNav();
+                    this.debouncedSave("分类已更名并保存");
                 }
             },
 
@@ -5178,6 +5286,11 @@
 
                 debug('将要保存的数据：',getData);
                 GM_setValue("searchEngineJumpData",getData);
+
+                // 同步更新内存中的全局变量，杜绝会话内后续读取旧缓存
+                getSettingData = getData;
+                engineList = obj;
+                engineList.details = engineDetails;
             },
 
             // 点击事件
@@ -5259,30 +5372,57 @@
                     return;
                 }
 
-                // 删除搜索
-                if(~targetClass.indexOf("iqxin-set-del") || e.target.closest(".iqxin-set-del")){
-                    var delBtn = e.target.closest(".iqxin-set-del") || e.target;
+                // 删除搜索 (持久化保存 + 阻止冒泡 + 重新分区排序 + 更新计数)
+                var delBtn = e.target.closest(".iqxin-set-del");
+                if (~targetClass.indexOf("iqxin-set-del") || delBtn) {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    delBtn = delBtn || e.target;
                     var dragItem = delBtn.closest(".drag");
                     if (dragItem && dragItem.parentNode) {
+                        var parentSejcon = dragItem.closest(".sejcon");
+                        var catSection = dragItem.closest(".iqxin-items");
                         dragItem.parentNode.removeChild(dragItem);
+                        if (parentSejcon) {
+                            if (getSettingData.autoSortEngine === 1) {
+                                sortEngineDomCards(parentSejcon, true);
+                            } else if (getSettingData.autoSortEngine === 2) {
+                                sortEngineDomCards(parentSejcon, false);
+                            } else {
+                                partitionEngineDomCards(parentSejcon);
+                            }
+                        }
+                        if (catSection) {
+                            var badge = catSection.querySelector(".sej-cat-badge");
+                            if (badge && parentSejcon) {
+                                badge.innerText = parentSejcon.querySelectorAll(".drag").length + " 个源";
+                            }
+                        }
                         if (this.renderNav) this.renderNav();
+                        this.debouncedSave("搜索引擎已删除并保存");
                     }
                     return;
                 };
 
-                // 删除分类列表
-                if(~targetClass.indexOf("iqxin-set-title-del") || e.target.closest(".iqxin-set-title-del")){
-                    var catItem = e.target.closest(".iqxin-items");
+                // 删除分类列表 (持久化保存 + 阻止冒泡 + 更新导航)
+                var catDelBtn = e.target.closest(".iqxin-set-title-del");
+                if (~targetClass.indexOf("iqxin-set-title-del") || catDelBtn) {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    var catItem = (catDelBtn || e.target).closest(".iqxin-items");
                     if (catItem && catItem.parentNode) {
                         catItem.parentNode.removeChild(catItem);
                         if (this.renderNav) this.renderNav();
+                        this.debouncedSave("分类已删除并保存");
                     }
                     return;
                 };
 
                 // 添加单个引擎卡片
-                if(~targetClass.indexOf("iqxin-additem")){
-                    this.parentNode = e.target.parentNode;
+                var addBtn = e.target.closest(".iqxin-additem");
+                if (~targetClass.indexOf("iqxin-additem") || addBtn) {
+                    addBtn = addBtn || e.target;
+                    this.parentNode = addBtn.closest(".sejcon") || addBtn.parentNode;
                     this.addItemBox();
                     return;
                 }
@@ -5310,29 +5450,29 @@
                 }
 
                 // 增加搜索列表 (新分类)
-                if (targetid === "nSearchList") {
+                if (targetid === "nSearchList" || e.target.closest("#nSearchList")) {
                     this.addSearchListBox();
                     return;
                 }
 
                 // 对话框内的确定与取消
-                if (targetid === "addItemBoxEnter") {
+                if (targetid === "addItemBoxEnter" || e.target.closest("#addItemBoxEnter, .addItemBoxEnter")) {
                     this.addItemEnger();
                     return;
                 }
-                if (targetid === "addItemBoxCancel") {
+                if (targetid === "addItemBoxCancel" || e.target.closest("#addItemBoxCancel, .addItemBoxCancel")) {
                     this.addItemBoxRemove();
                     return;
                 }
-                if (targetid === "editItemBoxEnter") {
+                if (targetid === "editItemBoxEnter" || e.target.closest("#editItemBoxEnter, .editItemBoxEnter")) {
                     this.editItemEnger();
                     return;
                 }
-                if (targetid === "addSearchListBoxEnter") {
+                if (targetid === "addSearchListBoxEnter" || e.target.closest("#addSearchListBoxEnter, .addSearchListBoxEnter")) {
                     this.addSearchListEnger();
                     return;
                 }
-                if (targetid === "addSearchListBoxCancel") {
+                if (targetid === "addSearchListBoxCancel" || e.target.closest("#addSearchListBoxCancel, .addSearchListBoxCancel")) {
                     this.addItemBoxRemove("#newSearchListBox");
                     return;
                 }
@@ -5935,7 +6075,9 @@
                         "-webkit-user-drag: none !important;" +
                     "}" +
                     "#settingLayer .drag:hover .iqxin-set-edit," +
-                    "#settingLayer .drag:hover .iqxin-set-del {" +
+                    "#settingLayer .drag:hover .iqxin-set-del," +
+                    "#settingLayer .iqxin-set-del.iqxin-set-active," +
+                    "#settingLayer .iqxin-set-title-del.iqxin-set-active {" +
                         "display: inline-flex !important;" +
                         "opacity: 0.65 !important;" +
                     "}" +
