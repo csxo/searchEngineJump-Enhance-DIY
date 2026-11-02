@@ -3,9 +3,9 @@
 // @author         NLF & 锐经 & iqxin & csxo
 // @contributor    iqxin, csxo
 // @description    方便在各个搜索引擎之间快捷跳转，新增AI搜索分类（ChatGPT、Perplexity、秘塔AI、Devv、Claude等主流AI搜索源），设置页重构为左侧竖版分类导航与右侧横向卡片布局（现代化简约设计），支持分类导航与引擎卡片平滑拖拽重排、自动持久化与数字➔A-Z➔中文智能排序，全浏览器兼容。
-// @version        0.1.1
+// @version        0.1.2
 // @created        2011-07-02
-// @lastUpdated    2026-10-20
+// @lastUpdated    2026-11-02
 
 // @namespace      https://github.com/csxo/searchEngineJump-Enhance-DIY
 // @homepage       https://github.com/csxo/searchEngineJump-Enhance-DIY
@@ -4300,7 +4300,7 @@
                     '<div class="sej-header-left">' +
                         '<span class="sej-header-logo"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0071e3" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg></span>' +
                         '<span class="sej-header-title">searchEngineJump 设置中心</span>' +
-                        '<span class="sej-header-badge">V0.1.1</span>' +
+                        '<span class="sej-header-badge">V0.1.2</span>' +
                     '</div>' +
                     '<div class="sej-header-right">' +
                         '<span id="xin-close" class="sej-header-close-btn" title="关闭设置 (Esc)">×</span>' +
